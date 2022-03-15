@@ -44,6 +44,48 @@ void insert(hashmap *table[], char symbol[], char mapping[]) {
 	table[hash_key] = to_add;
 }
 
+// function to seargh for a mapping in our hashmap
+char *getMapping(hashmap *table[], char mapping[]) {
+	int hash_key = gen_hash(key) % TABLESIZE;
+	hashmap *map = table[hash_key];
+	hashmap *aux = map;
+
+	while(aux) {
+		if (strcmp(aux->mapping, mapping) == 0)
+			return aux->mapping;
+		aux = aux->next;
+	}
+
+	return "";
+}
+
+// removes from the hashmap the symbol
+void removeFromHash(hashmap *table[], char symbol[]) {
+	int hash_key = gen_hash(symbol) % TABLESIZE;
+	hashmap *map = table[hash_key];
+	hashmap *aux = map;
+	hashmap *prev;
+
+	if (aux != NULL && strcmp(aux->symbol, symbol) == 0) {
+		map = aux->next;
+		table[hash_key] = list;
+		free(aux);
+		return;
+	}
+
+	while(aux != NULL && strcmp(aux->symbol, symbol)) {
+		prev = aux;
+		aux = aux->next;
+	}
+
+	if(aux == NULL)
+		return:
+
+	prev->next = aux->next;
+	table[hash_key] = list;
+	free(aux);
+}
+
 // TODO add future functions for the hashmap
 
 int main(int argc, char *argv[]) {
