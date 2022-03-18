@@ -4,7 +4,7 @@
 
 #define MY_DEF 4
 #define BUFSIZE 256
-#define TABLESIZE 256
+#define HASHSIZE 256
 
 typedef struct hashmap {
 	char symbol[BUFSIZE];
@@ -13,79 +13,64 @@ typedef struct hashmap {
 } hashmap;
 
 // function to generate the hash of the table
-int gen_hash(char symbol[]) {
+int hashCode(char symbol[]) {
 	int hashed = 0;
+	int i;
 
-	for(int i = 0; i < strlen(symbol); i++) {
-		hashed += symbol[i];
-	}
+	for(i = 0; i < strlen(symbol); i++)
+		hashed += symbol[i] % HASHSIZE;
 
-	return hashed;
+	return hashed % HASHSIZE;
 }
 
 // function to insert a value into the hash table
-void insert(hashmap *table[], char symbol[], char mapping[]) {
-	int hash_key = gen_hash(symbol) % TABLESIZE;
-	hashmap *map = table[hash_key];
-	hashmap *aux = map;
+void insert(hashmap *hmap[], char symbol[], char mapping[]) {
+	hashmap *map = hmap[hashCode(symbol)];
 	hashmap *to_add = (hashmap *) malloc(sizeof(hashmap));
 
-	while(aux) {
-		if(strcmp(aux->symbol, symbol) == 0) {
-			strcpy(aux->mapping, mapping);
-			return;
-		}
-		aux = aux->next;
+	if(to_add == NULL)
+		exit(12);
+	else {
+		strcpy(to_add->symbol, symbol);
+		strcpy(to_add->mapping, mapping);
+		to_add->next = map;
+		hmap[hashCode(symbol)] = to_add;
 	}
-
-	strcpy(to_add->symbol, symbol);
-	strcpy(to_add->mapping, mapping);
-	to_add->next = map;
-	table[hash_key] = to_add;
 }
 
-// function to seargh for a mapping in our hashmap
-char *getMapping(hashmap *table[], char mapping[]) {
-	int hash_key = gen_hash(mapping) % TABLESIZE;
-	hashmap *map = table[hash_key];
-	hashmap *aux = map;
+// function to search for a mapping in our hashmap
+char *getMapping(hashmap *hmap[], char symbol[]) {
+	hashmap *map = hmap[hashCode(symbol)];
 
-	while(aux) {
-		if (strcmp(aux->mapping, mapping) == 0)
-			return aux->mapping;
-		aux = aux->next;
+	while(map) {
+		if (strcmp(map->symbol, symbol) == 0) {
+			return map->mapping;
+			break;
+		}
+		map = map->next;
 	}
 
 	return "";
 }
 
 // removes from the hashmap the symbol
-void removeFromHash(hashmap *table[], char symbol[]) {
-	int hash_key = gen_hash(symbol) % TABLESIZE;
-	hashmap *map = table[hash_key];
-	hashmap *aux = map;
-	hashmap *prev;
+void removeFromHash(hashmap *hmap[], char symbol[]) {
+	hashmap **map = &hmap[hashCode(symbol)];
 
-	if (aux != NULL && strcmp(aux->symbol, symbol) == 0) {
-		map = aux->next;
-		table[hash_key] = map;
-		free(aux);
-		return;
+	while(*map) {
+		hashmap *tmp = *map;
+		if(strcmp(tmp->symbol, symbol) == 0) {
+			*map = tmp->next;
+			free(tmp);
+			break;
+		} else {
+			map = &(*map)->next;
+		}
 	}
 
-	while(aux != NULL && strcmp(aux->symbol, symbol)) {
-		prev = aux;
-		aux = aux->next;
-	}
-
-	if(aux == NULL)
-		return;
-
-	prev->next = aux->next;
-	table[hash_key] = map;
-	free(aux);
 }
-////////////////////////////TODO MODIFY
+////////////////////////////TODO MODIFY FROM HERE
+// function to form the directory path
 char *getDir(char *fileName)
 {
 	char direct[BUFSIZE] = {0};
@@ -116,7 +101,7 @@ void freeMem(hashmap *table[], int size, char *directory[])
 
 	for (i = 0; i < size; i++)
 		free(directory[i]);
-	for (i = 0; i < TABLESIZE; i++) {
+	for (i = 0; i < HASHSIZE; i++) {
 		aux = table[i];
 		while (aux) {
 			aux2 = aux;
@@ -126,19 +111,34 @@ void freeMem(hashmap *table[], int size, char *directory[])
 	}
 }
 
+
+//TODO modify this
+int containsKey(hashmap *table[], char *key)
+{
+	int position = hashCode(key);
+	hashmap *list = table[position];
+	hashmap *aux = list;
+
+	while (aux) {
+		if (strcmp(aux->symbol, key) == 0)
+			return 1;
+		aux = aux->next;
+	}
+	return 0;
+}
+
 char *changeLine(char *line, hashmap *table[])
 {
 	char aux2[BUFSIZE], buffer[BUFSIZE], value[BUFSIZE];
 	char *aux, *p, *q;
 	int len = 0;
-
 	strcpy(aux2, line);
 	strcpy(buffer, line);
-	// printf("am linia %s asta\n", line);
 	aux = strtok(line, "\t[]{}<>=+-*/%!&|^.,:;()\\\n ");
-	// printf("%s line\n", line);
 	while (aux) {
-		if (strcmp(getMapping(table, aux), "") != 0) {  // TODO E STRICAT ASTA, TB CU CONTAINS KEY
+		if (containsKey(table, aux)) {  // TODO E STRICAT ASTA, TB CU CONTAINS KEY
+			// printf(" am primit line -> %s \n", buffer);
+
 			q = strstr(aux2, "\"");
 			if (q) {
 				q += 1;
@@ -153,16 +153,21 @@ char *changeLine(char *line, hashmap *table[])
 				}
 			} else
 				p = strstr(aux2, aux);
+
+				// printf("ce an ub p %s\n", p);
 			strncpy(buffer, aux2, p-aux2);
-			printf("%s am aux\n", aux);
+			// printf("%s ce am gasit in MAPPING",getMapping(table, aux));
 			strcpy(value, getMapping(table, aux));
 			len = strlen(aux);
 			sprintf(buffer+(p-aux2), "%s%s", value, p + len);
 			strcpy(aux2, buffer);
+			// printf(" am returnat line -> %s \n", buffer);
+
 		}
 		aux = strtok(NULL, "\t[]{}<>=+-*/%!&|^.,:;()\\\n ");
 	}
 	strcpy(line, buffer);
+
 	return line;
 }
 ////////////////////////////////////////////
@@ -194,7 +199,7 @@ int include_line(hashmap *table[], char line[], int dir_size, FILE *output_file,
 		}
 		if (!found) {
 			freeMem(table, dir_size, directory);
-			exit(1);
+			exit(12);
 		}
 	}
 	return ret;
@@ -264,13 +269,148 @@ int define_line(hashmap *table[], FILE *input_file, char line[]) {
 	return ret;
 }
 
-int ifnd_line(hashmap *table[], FILE *input_file, char line[]) {
+int ifdfLine(hashmap *table[], FILE *input_file, FILE *output_file, char line[]) {
+	char *iffdef, *key;
+	int ret = 0, noPrint = 0, branch;
+
+	iffdef = strstr(line, "#ifdef");
+	if (iffdef) {
+		ret = 1;
+		strtok(line, " ");
+		key = strtok(NULL, "\n");
+		branch = containsKey(table, key);
+		if (!branch)
+			noPrint = 1;
+		while (fgets(line, BUFSIZE, input_file)) {
+			if (strstr(line, "else")) {
+				if (!branch)
+					noPrint = 0;
+				else
+					noPrint = 1;
+				continue;
+			}
+			if (!noPrint && define_line(table, input_file, line))
+				continue;
+			if (strstr(line, "#undef")) {
+				strtok(line, " ");
+				key = strtok(NULL, "\n");
+				removeFromHash(table, key);
+				continue;
+			}
+			if (!noPrint && strstr(line, "#endif") == NULL)
+				fputs(changeLine(line, table), output_file);
+			else if (strstr(line, "endif"))
+				break;
+		}
+	}
+	return ret;
+}
+
+int if_line(hashmap *table[], FILE *input_file, FILE *output_file, char line[]) {
+	char *iff, *value, *chg, *eif;
+	int noPrint, choose = 0, ret = 0;
+
+	iff = strstr(line, "#if ");
+	if (iff) {
+		ret = 1;
+		noPrint = 0;
+		strtok(line, " ");
+		value = strtok(NULL, "\n");
+		if (strcmp(changeLine(value, table), "0") != 0) {
+			while (fgets(line, BUFSIZE, input_file)) {
+				if (strstr(line, "#else"))
+					noPrint = 1;
+				if (!noPrint && define_line(table, input_file, line))
+					continue;
+				if (!noPrint && strstr(line, "#endif") == NULL)
+					fputs(changeLine(line, table), output_file);
+				if (strstr(line, "#endif") != NULL)
+					break;
+			}
+		} else {
+			noPrint = 1;
+			while (fgets(line, BUFSIZE, input_file)) {
+				if (strstr(line, "#elif")) {
+					strtok(line, " ");
+					value = strtok(NULL, "\n");
+					chg = changeLine(value, table);
+					if (strcmp(chg, "0") != 0) {
+						noPrint = 0;
+						choose = 1;
+						fgets(line, BUFSIZE, input_file);
+					}
+				}
+				if (strstr(line, "#else")) {
+					if (choose)
+						noPrint = 1;
+					else
+						noPrint = 0;
+					fgets(line, BUFSIZE, input_file);
+				}
+				if (strstr(line, "#endif"))
+					break;
+				eif = strstr(line, "#endif");
+				if (!noPrint && eif == NULL) {
+					fputs(changeLine(line, table), output_file);
+					continue;
+				} else
+					continue;
+			}
+		}
+	}
+	return ret;
+}
+
+int ifndf_line(hashmap *table[], FILE *input_file, FILE *output_file, char line[], int dir_size,
+		char **directory) {
+	char *iffndef, *key;
 	int ret = 0;
 
-
+	iffndef = strstr(line, "#ifndef");
+	if (iffndef) {
+		ret = 1;
+		strtok(line, " ");
+		key = strtok(NULL, "\n");
+		if (!containsKey(table, key)) {
+			while (fgets(line, BUFSIZE, input_file)) {
+				if (include_line(table, line, dir_size, output_file, directory))
+					continue;
+				if (ifndf_line(table, input_file, output_file, line, dir_size, directory))
+					continue;
+				if (define_line(table, input_file, line))
+					continue;
+				if (ifdfLine(table, input_file, output_file, line))
+					continue;
+				if (if_line(table, input_file, output_file, line))
+					continue;
+				else if (strstr(line, "#endif")) {
+					fgets(line, BUFSIZE, input_file);
+					break;
+				} else if (strcmp(line, "\n") != 0) {
+					fputs(changeLine(line, table), output_file);
+				}
+			}
+		} else {
+			while (fgets(line, BUFSIZE, input_file))
+				if (strstr(line, "#endif"))
+					break;
+		}
+	}
 	return ret;
 }
 //////////////////////////////////
+
+int undefLine(hashmap *table[], FILE* input_file, char line[]) {
+	int ret = 0;
+
+	char *isUndefine = strstr(line, "#undef");
+	if(isUndefine) {
+		strtok(line, " ");
+		removeFromHash(table, strtok(NULL, "\n"));
+		ret = 1;
+	}
+	return ret;
+}
 
 // function to parse the file
 void parseFile(hashmap *table[], FILE *input_file, FILE *output_file, int dir_size,
@@ -278,20 +418,25 @@ void parseFile(hashmap *table[], FILE *input_file, FILE *output_file, int dir_si
 	char line[BUFSIZE];
 
 	while(fgets(line, BUFSIZE, input_file)) {
-		// printf("axix   %sjjj\n", line);
 
-		// if(include_line(table, line, dir_size, output_file, directory))
-		// 	continue;
+		if(include_line(table, line, dir_size, output_file, directory))
+			continue;
 		if(define_line(table, input_file, line))
 			continue;
-		// if(ifndf_line(table, input_file, line))
-		// 	continue;
-		if(strcmp(line, "\n") != 0) {
-			// printf("din hashtable am %s ", getMapping(table, "")); // TODO REPARA HASHTABLE
-			// printf("intri?");
+		if(ifndf_line(table, input_file, output_file, line, dir_size, directory))
+			continue;
+		if(ifdfLine(table, input_file, output_file, line))
+			continue;
+		if(if_line(table, input_file, output_file, line))
+			continue;
+		if(undefLine(table, input_file, line))
+			continue;
+		else if(strcmp(line, "\n") != 0) {
 			fputs(changeLine(line, table), output_file);
 
-		}
+		} else
+			fputs("\n", output_file);
+
 // TODO HERE !! UNFINISHED PROCESSED FILE
 	}
 }
@@ -305,11 +450,11 @@ int main(int argc, char *argv[]) {
 
 	int dir_size = 1;
 	int check_out_file = 0, check_in_file = 0;
-	char *directory[TABLESIZE];
+	char *directory[HASHSIZE];
 	char infile[BUFSIZE] = {0};
-	hashmap *table[TABLESIZE];
+	hashmap *table[HASHSIZE];
 
-	for(int i = 0; i < TABLESIZE; i++) {
+	for(int i = 0; i < HASHSIZE; i++) {
 		table[i]= NULL;
 	}
 
@@ -319,16 +464,11 @@ int main(int argc, char *argv[]) {
 	for (int i = 1; i < argc; i++) {
 		if(strncmp(argv[i], "-D", 2) == 0) {
 			if(strlen(argv[i]) == 2) {
-				// printf("am argumentul %s \n", argv[i+1]);
 				symbol = strtok(argv[++i],"=");
 				mapping = strtok(NULL, " ");
-				// i++;
-				// printf("AM MAPPING %s\n\n", mapping);
 			} else {
-				// char *aux = strtok(argv[i], "-D");
-				symbol =  strtok(argv[i] + 2, "=");  //strtok(NULL, "=");
+				symbol =  strtok(argv[i] + 2, "=");
 				mapping = strtok(NULL, " ");
-				// printf("AM MAPPING %s\n\n", mapping);
 
 			}
 
@@ -369,32 +509,32 @@ int main(int argc, char *argv[]) {
 			input_file = fopen(argv[i], "r");
 			strcpy(infile, argv[i]);
 			if (input_file == NULL)
-				exit(-1);
+				exit(12);
 			directory[0] = (char *) calloc(strlen(argv[i]) + 1, sizeof(char));
 			if (!directory[0])
 				exit(12);
-			strcpy(directory[0], getDir(argv[i]));  // TODO getDir
+			strcpy(directory[0], getDir(argv[i]));
 			check_in_file = 1;
 			continue;
 		}
 
-		// if (!check_out_file && argv[i]) {
-		// 	if (strcmp(argv[i], infile) == 0)
-		// 		exit(-1);
-		// 	output_file = fopen(argv[i], "w");
-		// 	if (output_file == NULL)
-		// 		exit(-1);
-		// 	check_out_file = 1;
-		// 	continue;
-		// }
+		if (!check_out_file && argv[i]) {
+			if (strcmp(argv[i], infile) == 0)
+				exit(12);
+			output_file = fopen(argv[i], "w");
+			if (output_file == NULL)
+				exit(12);
+			check_out_file = 1;
+			continue;
+		}
 
-		// if (argv[i])
-		// 	exit(-1);
+		if (argv[i])
+			exit(12);
 	}
 
 
 	parseFile(table, input_file, output_file, dir_size, directory);
-	// freeMem(table);
+	freeMem(table, dir_size, directory);
 
 
 	if(input_file)
