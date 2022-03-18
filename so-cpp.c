@@ -4,7 +4,7 @@
 
 #define MY_DEF 4
 #define BUFSIZE 256
-#define TABLESIZE 100
+#define TABLESIZE 256
 
 typedef struct hashmap {
 	char symbol[BUFSIZE];
@@ -134,9 +134,11 @@ char *changeLine(char *line, hashmap *table[])
 
 	strcpy(aux2, line);
 	strcpy(buffer, line);
+	// printf("am linia %s asta\n", line);
 	aux = strtok(line, "\t[]{}<>=+-*/%!&|^.,:;()\\\n ");
+	// printf("%s line\n", line);
 	while (aux) {
-		if (strcmp(getMapping(table, aux), "") != 0) {
+		if (strcmp(getMapping(table, aux), "") != 0) {  // TODO E STRICAT ASTA, TB CU CONTAINS KEY
 			q = strstr(aux2, "\"");
 			if (q) {
 				q += 1;
@@ -152,6 +154,7 @@ char *changeLine(char *line, hashmap *table[])
 			} else
 				p = strstr(aux2, aux);
 			strncpy(buffer, aux2, p-aux2);
+			printf("%s am aux\n", aux);
 			strcpy(value, getMapping(table, aux));
 			len = strlen(aux);
 			sprintf(buffer+(p-aux2), "%s%s", value, p + len);
@@ -206,8 +209,10 @@ int define_line(hashmap *table[], FILE *input_file, char line[]) {
 	char c;
 
 	strcpy(auxline, line);
+	// printf("auxline %s\n", auxline);
 	ndf = strstr(auxline, "\"#define");
 	df = strstr(line, "#define");
+	// printf("ndf %s and df %s\n", ndf, df);
 	if (!ndf && df) {
 		ret = 1;
 		strcpy(auxline, line);
@@ -258,6 +263,13 @@ int define_line(hashmap *table[], FILE *input_file, char line[]) {
 	}
 	return ret;
 }
+
+int ifnd_line(hashmap *table[], FILE *input_file, char line[]) {
+	int ret = 0;
+
+
+	return ret;
+}
 //////////////////////////////////
 
 // function to parse the file
@@ -266,11 +278,21 @@ void parseFile(hashmap *table[], FILE *input_file, FILE *output_file, int dir_si
 	char line[BUFSIZE];
 
 	while(fgets(line, BUFSIZE, input_file)) {
-		if(include_line(table, line, dir_size, output_file, directory))
-			continue;
+		// printf("axix   %sjjj\n", line);
+
+		// if(include_line(table, line, dir_size, output_file, directory))
+		// 	continue;
 		if(define_line(table, input_file, line))
 			continue;
-// TODO HERE !!
+		// if(ifndf_line(table, input_file, line))
+		// 	continue;
+		if(strcmp(line, "\n") != 0) {
+			// printf("din hashtable am %s ", getMapping(table, "")); // TODO REPARA HASHTABLE
+			// printf("intri?");
+			fputs(changeLine(line, table), output_file);
+
+		}
+// TODO HERE !! UNFINISHED PROCESSED FILE
 	}
 }
 
@@ -297,12 +319,17 @@ int main(int argc, char *argv[]) {
 	for (int i = 1; i < argc; i++) {
 		if(strncmp(argv[i], "-D", 2) == 0) {
 			if(strlen(argv[i]) == 2) {
-				symbol = strtok(argv[i++],"=");
+				// printf("am argumentul %s \n", argv[i+1]);
+				symbol = strtok(argv[++i],"=");
 				mapping = strtok(NULL, " ");
+				// i++;
+				// printf("AM MAPPING %s\n\n", mapping);
 			} else {
 				// char *aux = strtok(argv[i], "-D");
 				symbol =  strtok(argv[i] + 2, "=");  //strtok(NULL, "=");
 				mapping = strtok(NULL, " ");
+				// printf("AM MAPPING %s\n\n", mapping);
+
 			}
 
 			insert(table, symbol, (mapping != NULL) ? mapping : "");
