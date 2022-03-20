@@ -1,5 +1,49 @@
+Moraru Anemona Maria 333CC
 
-Pentru verificarea temei copiati executabilul tema1 in
-acelasi director cu scriptul de testare (run_all.sh) si apelati:
+Tema 1 - Multi-platform Development
 
-make -f Makefile.checker
+SO
+
+Martie 2022
+
+ORGANIZARE
+
+In main() am initializat variabilele de care aveam nevoie, apoi am parsat
+argumentele cu care este apelat executabilul. In functie de argumentul
+predefinit gasit, retin celelalte argumente dupa schematizarea prezentata
+in enuntul temei.
+
+Urmatorul pas il reprezinta citirea fisierului dat ca input. Citesc linie cu
+linie pana gasesc cuvintele specifice limbajului C a directivelor de
+preprocesare. In functie de ce string cheie intalnesc, apelez functia care
+prelucreaza fiecare directiva in parte. Functiile directivelor printeaza
+in fisierul de output linia dupa ce a fost prelucrata.
+
+In final eliberez memoria alocata si inchid fisierele deschise.
+
+Am ales sa lucrez cu o structura de hashmap-uri careia i-am implementat
+functiile uzuale.
+
+Tema a durat aproximativ 15 ore.
+
+
+IMPLEMENTARE
+
+Intreg enuntul temei a fost implementat. A fost o tema muncitoreasca in
+principal.
+
+
+CUM SE COMPILEAZA SI CUM RULEAZA?
+
+Exista doua makefile-uri, asa cum este specificat in enunt, care genereaza
+fisierul 'so-cpp'. Am lucrat cu o singura sursa.
+
+
+BIBLIOGRAFIE
+
+Cursuri & laboratoare SO
+
+
+GIT
+
+Nu am postat pe Gitlab.
