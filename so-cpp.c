@@ -171,105 +171,95 @@ int include_line(hashmap *hmap[], char line[], int dir_size, FILE *output_file,
 	return 0;
 }
 
-///////////////////////////////TODO MODIFY
-int define_line(hashmap *table[], FILE *input_file, char line[]) {
-	char *df, *mdf, *key, *value, *nmdf, *ndf, *aux;
-	int ret = 0;
-	char auxval[BUFSIZE] = {0};
-	char auxkey[BUFSIZE], auxline[BUFSIZE];
-	int p = 0, nrSpace = 0, space = 0, lastLine = 0, len = 0;
-	char c;
+// function to parse a define_line
+int define_line(hashmap *hmap[], FILE *input_file, char line[]) {
+	char  *has_more_arguments, *symbol, *mapping;
+	int result = 0;
+	char *auxmapping, *auxsymbol;
+	int length_mapping = 0, number_of_spaces = 0;
 
-	strcpy(auxline, line);
-	// printf("auxline %s\n", auxline);
-	ndf = strstr(auxline, "\"#define");
-	df = strstr(line, "#define");
-	// printf("ndf %s and df %s\n", ndf, df);
-	if (!ndf && df) {
-		ret = 1;
-		strcpy(auxline, line);
-		nmdf = strstr(auxline, "\\n");
-		mdf = strstr(line, "\\");
-		if (!nmdf && mdf) {
-			strtok(line, " ");
-			key = strtok(NULL, " ");
-			strcpy(auxkey, key);
-			value = strtok(NULL, "\\");
-			strcpy(auxval, value);
-			p = strlen(value);
-			while (mdf && fgets(line, BUFSIZE, input_file)) {
-				mdf = strstr(line, "\\");
-				if (!mdf)
-					lastLine = 1;
-				if (mdf || lastLine) {
-					c = line[0];
-					nrSpace = 0;
-					while (c == ' ') {
-						nrSpace++;
-						c = line[nrSpace];
-					}
-					aux = line + nrSpace;
-					if (lastLine)
-						value = strtok(aux, "\n");
-					else
-						value = strtok(aux, "\\");
-					if (space) {
-						strncpy(auxval + p, " ", 1);
-						p += 1;
-					}
-					len = strlen(value);
-					strncpy(auxval + p, value, len);
-					space = 1;
-					p += strlen(value);
+	if (strncmp(line, "#define", 7) == 0) {
+		result = 1;
+		has_more_arguments = strstr(line, "\\");
+		symbol = strtok(line, " ");
+		symbol = strtok(NULL, " ");
+		if (has_more_arguments) {
+			auxsymbol = malloc(sizeof(char *) * (strlen(symbol) + 1));
+
+			if(!auxsymbol)
+				exit(12);
+			memcpy(auxsymbol, symbol, (strlen(symbol) +1));
+			mapping = strtok(NULL, "\\");
+
+			auxmapping = calloc(strlen(mapping) + 1, sizeof(char *));
+			if(!auxmapping)
+				exit(12);
+			memcpy(auxmapping, mapping, strlen(mapping) + 1);
+			length_mapping = strlen(mapping);
+
+			while (has_more_arguments && fgets(line, BUFSIZE, input_file)) {
+				has_more_arguments = strstr(line, "\\");
+				number_of_spaces = 0;
+				while (line[number_of_spaces] == ' ') {
+					number_of_spaces++;
+					line++;
 				}
+				if (!has_more_arguments)
+					mapping = strtok(line, "\n");
+				else
+					mapping = strtok(line, "\\");
+
+				strncpy(auxmapping + length_mapping, mapping, strlen(mapping));
+				length_mapping += strlen(mapping);
 			}
-			insert(table, auxkey, auxval);
+			if(strcmp(getMapping(hmap, auxsymbol), "") == 0)
+				insert(hmap, auxsymbol, auxmapping);
+			free(auxsymbol);
+			free(auxmapping);
 		} else {
-			strcpy(auxkey, line);
-			strtok(line, " ");
-			key = strtok(NULL, " ");
-			value = strtok(NULL, "'\n'");
-			if (value)
-				insert(table, key, changeLine(value, table));
+			auxsymbol = malloc(sizeof(char *) * (strlen(line) + 1));
+			if(!auxsymbol)
+				exit(12);
+			memcpy(auxsymbol, line, strlen(line) + 1);
+
+			mapping = strtok(NULL, "'\n'");
+			if (mapping && strcmp(getMapping(hmap, symbol), "") == 0) {
+				insert(hmap, symbol, changeLine(mapping, hmap));
+			}
+			free(auxsymbol);
 		}
 	}
-	return ret;
+
+	return result;
 }
 
-int ifdfLine(hashmap *table[], FILE *input_file, FILE *output_file, char line[]) {
-	char *iffdef, *key;
-	int ret = 0, noPrint = 0, branch;
+// function to parse a ifdef line
+int ifdef_line(hashmap *hmap[], FILE *input_file, FILE *output_file, char line[]) {
+	char *symbol;
 
-	iffdef = strstr(line, "#ifdef");
-	if (iffdef) {
-		ret = 1;
+	if (strstr(line, "#ifdef")) {
 		strtok(line, " ");
-		key = strtok(NULL, "\n");
-		if (strcmp(getMapping(table, key), "") == 0)
-			noPrint = 1;
+		symbol = strtok(NULL, "\n");
+
 		while (fgets(line, BUFSIZE, input_file)) {
-			if (strstr(line, "else")) {
-				if (strcmp(getMapping(table, key), "") == 0)
-					noPrint = 0;
-				else
-					noPrint = 1;
-				continue;
-			}
-			if (!noPrint && define_line(table, input_file, line))
+
+			if (!strcmp(getMapping(hmap, symbol), "") == 0 &&
+				define_line(hmap, input_file, line))
 				continue;
 			if (strstr(line, "#undef")) {
-				strtok(line, " ");
-				key = strtok(NULL, "\n");
-				removeFromHash(table, key);
+				symbol = strtok(line, " ");
+				removeFromHash(hmap, strtok(NULL, "\n"));
 				continue;
 			}
-			if (!noPrint && strstr(line, "#endif") == NULL)
-				fputs(changeLine(line, table), output_file);
+			if (!strcmp(getMapping(hmap, symbol), "") == 0 &&
+				strstr(line, "#endif") == NULL)
+				fputs(changeLine(line, hmap), output_file);
 			else if (strstr(line, "endif"))
 				break;
 		}
+		return 1;
 	}
-	return ret;
+	return 0;
 }
 
 int if_line(hashmap *table[], FILE *input_file, FILE *output_file, char line[]) {
@@ -345,7 +335,7 @@ int ifndf_line(hashmap *table[], FILE *input_file, FILE *output_file, char line[
 					continue;
 				if (define_line(table, input_file, line))
 					continue;
-				if (ifdfLine(table, input_file, output_file, line))
+				if (ifdef_line(table, input_file, output_file, line))
 					continue;
 				if (if_line(table, input_file, output_file, line))
 					continue;
@@ -391,7 +381,7 @@ void parseFile(hashmap *table[], FILE *input_file, FILE *output_file, int dir_si
 			continue;
 		if(ifndf_line(table, input_file, output_file, line, dir_size, directory))
 			continue;
-		if(ifdfLine(table, input_file, output_file, line))
+		if(ifdef_line(table, input_file, output_file, line))
 			continue;
 		if(if_line(table, input_file, output_file, line))
 			continue;
