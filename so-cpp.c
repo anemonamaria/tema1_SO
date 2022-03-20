@@ -14,14 +14,27 @@ typedef struct hashmap {
 //  TODO fa alocari dinamice unde poti si schimba cu pointeri pe unde merge
 // TODO fa readme
 // TODO coding style
-// TODO MAKEFILE windows
+// TODO rename directory
 
+int hashCode(char *symbol);
+void insert(hashmap *hmap[], char *symbol, char *mapping);
+char *getMapping(hashmap *hmap[], char *symbol);
+void removeFromHash(hashmap *hmap[], char *symbol);
+void free_hashmap(hashmap *hmap[]);
+char *overwrite(char *line, hashmap *hmap[], FILE *output_file);
+void include_line(hashmap *hmap[], char *line, int dir_size, FILE *output_file,
+	char *directory[]);
+void define_line(hashmap *hmap[], FILE *input_file, char *line);
+void ifdef_line(hashmap *hmap[], FILE *input_file, FILE *output_file, char *line);
+void if_line(hashmap *hmap[], FILE *input_file, FILE *output_file, char *line);
+void ifndef_line(hashmap *hmap[], FILE *input_file, FILE *output_file, char *line
+	, int dir_size,	char **directory);
+int undef_line(hashmap *hmap[], FILE* input_file, char *line);
 void read_file(hashmap *hmap[], FILE *input_file, FILE *output_file, int dir_size,
 	char *directory[]);
 
-
 // function to generate the hash of the table
-int hashCode(char symbol[]) {
+int hashCode(char *symbol) {
 	int hashed = 0;
 	int i;
 
@@ -32,7 +45,7 @@ int hashCode(char symbol[]) {
 }
 
 // function to insert a value into the hash table
-void insert(hashmap *hmap[], char symbol[], char mapping[]) {
+void insert(hashmap *hmap[], char *symbol, char *mapping) {
 	hashmap *map = hmap[hashCode(symbol)];
 	hashmap *to_add = (hashmap *) malloc(sizeof(hashmap));
 
@@ -47,7 +60,7 @@ void insert(hashmap *hmap[], char symbol[], char mapping[]) {
 }
 
 // function to search for a mapping in our hashmap
-char *getMapping(hashmap *hmap[], char symbol[]) {
+char *getMapping(hashmap *hmap[], char *symbol) {
 	hashmap *map = hmap[hashCode(symbol)];
 
 	while(map) {
@@ -62,7 +75,7 @@ char *getMapping(hashmap *hmap[], char symbol[]) {
 }
 
 // removes from the hashmap the symbol
-void removeFromHash(hashmap *hmap[], char symbol[]) {
+void removeFromHash(hashmap *hmap[], char *symbol) {
 	hashmap *tmp, **map = &hmap[hashCode(symbol)];
 
 	while(*map) {
@@ -78,56 +91,58 @@ void removeFromHash(hashmap *hmap[], char symbol[]) {
 }
 
 // function to free the hashmap
-void free_hashmap(hashmap *hmap[])
-{
+void free_hashmap(hashmap *hmap[]) {
+	hashmap *tmp, *current;
 	int i;
-	hashmap *aux, *current;
 
 	for (i = 0; i < HASHSIZE; i++) {
-		aux = hmap[i];
-		while (aux) {
-			current = aux;
-			aux = aux->next;
+		tmp = hmap[i];
+		while (tmp) {
+			current = tmp;
+			tmp = tmp->next;
 			free(current);
 		}
 	}
 }
 
-// TODO check twice
 // function to return a new line for the processed file
-char *overwrite(char *line, hashmap *hmap[], FILE *output_file)
-{
-	char  symbol[BUFSIZE],  buffer[BUFSIZE], aux2[BUFSIZE];
-	char *aux, *p, *q;
+char *overwrite(char *line, hashmap *hmap[], FILE *output_file) {
+	char  *symbol, buffer[BUFSIZE], tmp[BUFSIZE];
+	char *counter, *needle;
 
-	strcpy(aux2, line);
+	strcpy(tmp, line);
 	strcpy(buffer, line);
-	aux = strtok(line, "\t []{}<>=+-*/%!&|^.,:;()\\");
+	char *token = strtok(line, "\t []{}<>=+-*/%!&|^.,:;()\\");
 
-	while (aux) {
-		if (strcmp(getMapping(hmap, aux), "") != 0) {
-			q = strstr(aux2, "\"");
-			if (q) {
-				q += 1;
-				p = strstr(aux2, aux);
-				if (q <= p) {
-					q = strstr(q, "\"");
-					p += strlen(aux);
-					if (p - aux2 < q - aux2)
-						p = strstr(q, aux);
+	while (token) {
+		if (strcmp(getMapping(hmap, token), "") != 0) {
+			needle = strstr(tmp, "\"");
+			if (needle) {
+				needle += 1;
+				counter = strstr(tmp, token);
+				if (needle <= counter) {
+					needle = strstr(needle, "\"");
+					counter += strlen(token);
+					if (counter - tmp < needle - tmp)
+						counter = strstr(needle, token);
 					else
-						p = strstr(aux2, aux);
+						counter = strstr(tmp, token);
 				}
 			} else
-				p = strstr(aux2, aux);
+				counter = strstr(tmp, token);
 
-			strncpy(buffer, aux2, p-aux2);
-			strncpy(symbol, getMapping(hmap, aux), strlen(getMapping(hmap, aux)) + 1);
-			sprintf(buffer+(p-aux2), "%s%s", symbol, p + strlen(aux));
-			strcpy(aux2, buffer);
+			strncpy(buffer, tmp, counter-tmp);
+			symbol = malloc(sizeof(char) * strlen(getMapping(hmap, token)) + 1);
+			if(!symbol)
+				exit(12);
+
+			memcpy(symbol, getMapping(hmap, token), strlen(getMapping(hmap, token)) + 1);
+			sprintf(buffer+(counter-tmp), "%s%s", symbol, counter + strlen(token));
+			strcpy(tmp, buffer);
+			free(symbol);
 
 		}
-		aux = strtok(NULL, "\t []{}<>=+-*/%!&|^.,:;()\\");
+		token = strtok(NULL, "\t []{}<>=+-*/%!&|^.,:;()\\");
 	}
 	strcpy(line, buffer);
 
@@ -139,11 +154,12 @@ char *overwrite(char *line, hashmap *hmap[], FILE *output_file)
 
 //  function to verify if the line read from the file is of type #include
 void include_line(hashmap *hmap[], char *line, int dir_size, FILE *output_file,
-		char *directory[]) {
+	char *directory[]) {
 
-	char *path_to_file = malloc(100 * sizeof(char));
+	char *path_to_file = malloc(BUFSIZE * sizeof(char));
 	if(!path_to_file)
 		exit(12);
+
 	strcpy(path_to_file, "");
 	char *input_file = strtok(line, "\"");
 	input_file = strtok(NULL, "\"");
@@ -151,7 +167,7 @@ void include_line(hashmap *hmap[], char *line, int dir_size, FILE *output_file,
 	FILE *open_input_file;
 
 	for (i = 0; i < dir_size; i++) {
-		strncpy(path_to_file, directory[i], strlen(directory[i]) + 1);
+		memcpy(path_to_file, directory[i], strlen(directory[i]) + 1);
 		strncat(path_to_file, "/", 1);
 		strncat(path_to_file, input_file, strlen(input_file) + 1);
 		open_input_file = fopen(path_to_file, "r");
@@ -169,11 +185,10 @@ void include_line(hashmap *hmap[], char *line, int dir_size, FILE *output_file,
 		free_hashmap(hmap);
 		exit(12);
 	}
-
 }
 
 // function to parse a define_line
-void define_line(hashmap *hmap[], FILE *input_file, char line[]) {
+void define_line(hashmap *hmap[], FILE *input_file, char *line) {
 	char  *has_more_arguments, *symbol, *mapping;
 	char *auxmapping, *auxsymbol;
 	int length_mapping = 0, number_of_spaces = 0;
@@ -184,15 +199,16 @@ void define_line(hashmap *hmap[], FILE *input_file, char line[]) {
 	symbol = strtok(NULL, " ");
 	if (has_more_arguments) {
 		auxsymbol = malloc(sizeof(char *) * (strlen(symbol) + 1));
-
 		if(!auxsymbol)
 			exit(12);
+
 		memcpy(auxsymbol, symbol, (strlen(symbol) +1));
 		mapping = strtok(NULL, "\\");
 
 		auxmapping = calloc(strlen(mapping) + 1, sizeof(char *));
 		if(!auxmapping)
 			exit(12);
+
 		memcpy(auxmapping, mapping, strlen(mapping) + 1);
 		length_mapping = strlen(mapping);
 
@@ -219,26 +235,24 @@ void define_line(hashmap *hmap[], FILE *input_file, char line[]) {
 		auxsymbol = malloc(sizeof(char *) * (strlen(line) + 1));
 		if(!auxsymbol)
 			exit(12);
-		memcpy(auxsymbol, line, strlen(line) + 1);
+
+		// memcpy(auxsymbol, line, strlen(line) + 1);
 
 		mapping = strtok(NULL, "'\n'");
-		if (mapping && strcmp(getMapping(hmap, symbol), "") == 0) {
+		if (mapping && strcmp(getMapping(hmap, symbol), "") == 0)
 			insert(hmap, symbol, overwrite(mapping, hmap, NULL));
-		}
 		free(auxsymbol);
 	}
-
 }
 
 // function to parse a ifdef line
-void ifdef_line(hashmap *hmap[], FILE *input_file, FILE *output_file, char line[]) {
-	char *symbol;
-
-	strtok(line, " ");
+void ifdef_line(hashmap *hmap[], FILE *input_file, FILE *output_file, char *line) {
+	char *symbol = strtok(line, " ");
 	symbol = strtok(NULL, "\n");
 
 	while (fgets(line, BUFSIZE, input_file)) {
-		if (!strcmp(getMapping(hmap, symbol), "") == 0 && strncmp(line, "#define", 7) == 0) {
+		if (!strcmp(getMapping(hmap, symbol), "") == 0 && strncmp(line,
+			"#define", 7) == 0) {
 			define_line(hmap, input_file, line);
 			continue;
 		}
@@ -256,11 +270,10 @@ void ifdef_line(hashmap *hmap[], FILE *input_file, FILE *output_file, char line[
 }
 
 // function tp parse a if line
-void if_line(hashmap *hmap[], FILE *input_file, FILE *output_file, char line[]) {
-	char *tmp;
+void if_line(hashmap *hmap[], FILE *input_file, FILE *output_file, char *line) {
+	char *tmp = strtok(line, " ");
 	int can_write = 0, aux = 0;
 
-	tmp = strtok(line, " ");
 	if (strncmp(overwrite(strtok(NULL, "\n"), hmap, NULL), "0", 1) != 0) {
 		while (fgets(line, BUFSIZE, input_file)) {
 			if (strncmp(line, "#endif", 6) == 0)
@@ -304,49 +317,49 @@ void if_line(hashmap *hmap[], FILE *input_file, FILE *output_file, char line[]) 
 }
 
 // function to parse an ifndef line
-void ifndef_line(hashmap *hmap[], FILE *input_file, FILE *output_file, char line[]
+void ifndef_line(hashmap *hmap[], FILE *input_file, FILE *output_file, char *line
 	, int dir_size,	char **directory) {
 	char *symbol = strtok(line, " ");
 	symbol = strtok(NULL, "\n");
 
 	while (fgets(line, BUFSIZE, input_file)) {
 		if (strcmp(getMapping(hmap, symbol), "") == 0) {
-			if (strncmp(line, "#include", 8) == 0) {
-				include_line(hmap, line, dir_size, output_file, directory);
+			if (strncmp(line, "#define", 7) == 0) {
+				define_line(hmap, input_file, line);
+				continue;
+			}
+			if (strncmp(line, "#if ", 4) == 0) {
+				if_line(hmap, input_file, output_file, line);
+				continue;
+			}
+			if (strncmp(line, "#ifdef", 6) == 0) {
+				ifdef_line(hmap, input_file, output_file, line);
 				continue;
 			}
 			if (strncmp(line, "#ifndef", 7) == 0) {
 				ifndef_line(hmap, input_file, output_file, line, dir_size, directory);
 				continue;
 			}
-			if (strncmp(line, "#define", 7) == 0) {
-				define_line(hmap, input_file, line);
-				continue;
-			}
-			if (strncmp(line, "#ifdef", 7) == 0) {
-				ifdef_line(hmap, input_file, output_file, line);
-				continue;
-			}
-			if (strncmp(line, "#if ", 3) == 0) {
-				if_line(hmap, input_file, output_file, line);
-				continue;
-			}
 			if (strncmp(line, "#endif", 6) == 0) {
 				fgets(line, BUFSIZE, input_file);
 				break;
+			}
+			if (strncmp(line, "#include", 8) == 0) {
+				include_line(hmap, line, dir_size, output_file, directory);
+				continue;
 			}
 			if (strcmp(line, "\n") != 0) {
 				overwrite(line, hmap, output_file);
 				continue;
 			}
 		}
-		else if (strstr(line, "#endif"))
+		else if (strncmp(line, "#endif", 6) == 0)
 			break;
 	}
 }
 
 // function to parse an #undef line
-int undef_line(hashmap *hmap[], FILE* input_file, char line[]) {
+int undef_line(hashmap *hmap[], FILE* input_file, char *line) {
 	int result = 0;
 
 	if(strstr(line, "#undef")) {
@@ -402,9 +415,10 @@ int main(int argc, char *argv[]) {
 	output_file = stdout;
 
 	int dir_size = 1;
-	int check_out_file = 0, check_in_file = 0;
+	int check_in_file = 0;
 	char *directory[HASHSIZE];
 	char infile[BUFSIZE] = {0};
+	char *aux, *token, *argument;
 	hashmap *table[HASHSIZE];
 
 	for(int i = 0; i < HASHSIZE; i++) {
@@ -426,49 +440,37 @@ int main(int argc, char *argv[]) {
 
 			insert(table, symbol, (mapping != NULL) ? mapping : "");
 			continue;
-		}
+		} else if(strncmp(argv[i], "-I", 2) == 0) {
+			if(strlen(argv[i]) == 2)
+				argument = argv[i++];
+			else
+				argument = argv[i] + 2;
 
-		if(strncmp(argv[i], "-I", 2) == 0) {
-			if(strlen(argv[i]) == 2) {
-				directory[dir_size] = (char *) calloc(strlen(argv[i + 1]) + 1, sizeof(char));
-				if (!directory[dir_size])
-					exit(12);
-				strcpy(directory[dir_size], argv[i++]);
-				dir_size++;
-				continue;
-			} else {
-				directory[dir_size] = (char *) calloc(strlen(argv[i]) - 1, sizeof(char));
-				if (!directory[dir_size])
-					exit(12);
-				strcpy(directory[dir_size], argv[i] + 2);
-				dir_size++;
-				continue;
-			}
-		}
+			directory[dir_size] = calloc(strlen(argument) + 1,
+				sizeof(char));
+			if (!directory[dir_size])
+				exit(12);
 
-		if(strncmp(argv[i], "-o", 2) == 0 && check_out_file == 0) {
-			if(strlen(argv[i]) == 2) {
-				output_file = fopen(argv[i++], "w");
-			} else {
-				output_file = fopen(strtok(argv[i] + 2, " "), "w");
-			}
-
-			check_out_file = 1;
+			strcpy(directory[dir_size], argument);
+			dir_size++;
 			continue;
-		}
-
-		if (!check_in_file && argv[i]) {
+		}else if(strncmp(argv[i], "-o", 2) == 0 && output_file == NULL) {
+			if(strlen(argv[i]) == 2)
+				argument = argv[i++];
+			else
+				argument = strtok(argv[i] + 2, " ");
+			output_file = fopen(argument, "w");
+			continue;
+		} else if (check_in_file == 0 && argv[i]) {
 			input_file = fopen(argv[i], "r");
 			strcpy(infile, argv[i]);
 			if (input_file == NULL)
 				exit(12);
-			directory[0] = (char *) calloc(strlen(argv[i]) + 1, sizeof(char));
+			directory[0] = calloc(strlen(argv[i]) + 1, sizeof(char));
 			if (!directory[0])
 				exit(12);
 
-			// generate the directory name  --->MOD HERE MAYBE?
-			// char result[BUFSIZE] = {0};
-			char *aux, *token = strtok(argv[i], "/");
+			token = strtok(argv[i], "/");
 			if(!token)
 				strcpy(directory[0], "./");
 			while(token) {
@@ -477,40 +479,32 @@ int main(int argc, char *argv[]) {
 					exit(12);
 				memcpy(aux, token, strlen(token) + 1);
 				strcat(aux, "/");
-				// token = strtok(NULL, "/");
 				if((token = strtok(NULL, "/")) == NULL)
 					break;
 				strcat(directory[0], aux);
 				free(aux);
 			}
 			free(aux);
-			// strcpy(directory[0], result);
 
 			check_in_file = 1;
 			continue;
-		}
-
-		if (!check_out_file && argv[i]) {
+		}else if (output_file == stdout && argv[i]) {
 			if (strcmp(argv[i], infile) == 0)
 				exit(12);
 			output_file = fopen(argv[i], "w");
 			if (output_file == NULL)
 				exit(12);
-			check_out_file = 1;
 			continue;
-		}
-
-		if (argv[i])
+		}else if (argv[i])
 			exit(12);
 	}
 
-
 	read_file(table, input_file, output_file, dir_size, directory);
+
 	int i;
 	for (i = 0; i < dir_size; i++)
 		free(directory[i]);
 	free_hashmap(table);
-
 
 	if(input_file)
 		fclose(input_file);
